@@ -8,6 +8,24 @@
                 ".write": "$code.matches(/^[A-Z0-9]{5}$/)",
                 ".validate": "!newData.exists() || newData.child('players/host/id').isString()"
             }
+        },
+        "leaderboard": {
+            "$year": {
+                ".read": "$year.matches(/^20[0-9][0-9]$/)",
+                ".indexOn": ["rank"],
+                "$player": {
+                    ".write": "$year.matches(/^20[0-9][0-9]$/) && $player.matches(/^[a-z0-9]{8,40}$/) && newData.exists()",
+                    ".validate": "newData.hasChildren(['name', 'solved', 'tries', 'lastDay', 'rank']) && newData.child('rank').val() == newData.child('solved').val() * 10000 - newData.child('tries').val() && ((data.exists() && newData.child('solved').val() == data.child('solved').val() && newData.child('tries').val() == data.child('tries').val() && newData.child('lastDay').val() == data.child('lastDay').val()) || (newData.child('lastDay').val() * 86400000 + 1640995200000 <= now + 86400000 && newData.child('lastDay').val() * 86400000 + 1640995200000 >= now - 172800000 && (data.exists() ? (newData.child('lastDay').val() > data.child('lastDay').val() && newData.child('solved').val() == data.child('solved').val() + 1 && newData.child('tries').val() - data.child('tries').val() >= 1 && newData.child('tries').val() - data.child('tries').val() <= 6) : (newData.child('solved').val() == 1 && newData.child('tries').val() >= 1 && newData.child('tries').val() <= 6))))",
+                    "name": {
+                        ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20"
+                    },
+                    "solved": { ".validate": "newData.isNumber()" },
+                    "tries": { ".validate": "newData.isNumber()" },
+                    "lastDay": { ".validate": "newData.isNumber()" },
+                    "rank": { ".validate": "newData.isNumber()" },
+                    "$other": { ".validate": false }
+                }
+            }
         }
     }
 }

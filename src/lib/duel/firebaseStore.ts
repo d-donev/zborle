@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app'
+import { getApps, initializeApp } from 'firebase/app'
 import {
     getDatabase,
     onDisconnect,
@@ -19,7 +19,7 @@ type Config = {
 }
 
 export const createFirebaseStore = (config: Config): DuelStore => {
-    const app = initializeApp(config)
+    const app = getApps()[0] ?? initializeApp(config)
     const db = getDatabase(app)
 
     // Both players use the server clock so "who guessed first" and the timers are fair

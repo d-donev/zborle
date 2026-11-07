@@ -18,7 +18,7 @@ export interface DuelStore {
     trackPresence(code: string, role: Role): () => void
 }
 
-const firebaseConfig = {
+export const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string | undefined,
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined,
     databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL as string | undefined,

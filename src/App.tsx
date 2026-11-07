@@ -5,6 +5,7 @@ import {
     Cog6ToothIcon,
     InformationCircleIcon,
     QuestionMarkCircleIcon,
+    TrophyIcon,
 } from '@heroicons/react/24/outline'
 import classnames from 'classnames'
 import { useEffect, useRef, useState } from 'react'
@@ -21,6 +22,7 @@ import { Confetti } from './components/ui/Confetti'
 import { DuelGame } from './components/duel/DuelGame'
 import { CalendarModal } from './components/modals/CalendarModal'
 import { RecapModal } from './components/modals/RecapModal'
+import { LeaderboardModal } from './components/modals/LeaderboardModal'
 import { getRecapYear } from './lib/recap'
 import {
     Archive,
@@ -31,7 +33,8 @@ import {
     loadArchive,
     saveArchive,
 } from './lib/archive'
-import { isValidDuelCode } from './lib/duel/store'
+import { getPlayerId, isOnlineDuelAvailable, isValidDuelCode, loadPlayerName } from './lib/duel/store'
+import { LeaderboardProfile, leaderboardYear, loadLeaderboardProfile, saveLeaderboardProfile } from './lib/leaderboard'
 import { ThemeToggle } from './components/ui/ThemeToggle'
 import { SoundToggle } from './components/ui/SoundToggle'
 import {
@@ -357,6 +360,37 @@ function App() {
 
     const playedDay = isArchive ? archiveDay! : todayDay
 
+    // Yearly top 10: today's word, solved today, is sent once this device has joined with a name
+    const [playerId] = useState(getPlayerId)
+    const [leaderboardProfile, setLeaderboardProfile] = useState<LeaderboardProfile>(loadLeaderboardProfile)
+    const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false)
+    const todaySolvedIn = dailyGuesses.indexOf(getWordByIndex(dayIndex)) + 1
+
+    useEffect(() => {
+        saveLeaderboardProfile(leaderboardProfile)
+    }, [leaderboardProfile])
+
+    useEffect(() => {
+        const { name, sentDay } = leaderboardProfile
+        if (!isOnlineDuelAvailable || !name || todaySolvedIn === 0 || sentDay === todayDay) return
+        import('./lib/leaderboardStore')
+            .then((m) => m.submitSolvedDay(playerId, name, todayDay, todaySolvedIn))
+            .then(() => setLeaderboardProfile((p) => ({ ...p, sentDay: todayDay })))
+            .catch(() => {
+                // offline or refused - tried again next time the app opens
+            })
+    }, [leaderboardProfile, todaySolvedIn, todayDay, playerId])
+
+    const saveLeaderboardName = (name: string) => {
+        const renamed = leaderboardProfile.name !== null && leaderboardProfile.name !== name
+        setLeaderboardProfile((p) => ({ ...p, name }))
+        if (renamed) {
+            import('./lib/leaderboardStore')
+                .then((m) => m.renamePlayer(playerId, name, leaderboardYear(todayDay)))
+                .catch(() => showAlert('Името не е зачувано. Обидете се повторно.'))
+        }
+    }
+
     // Year-end greeting card (31 December - 7 January)
     const recapYear = getRecapYear(todayDay)
     const [isRecapOpen, setIsRecapOpen] = useState(false)
@@ -416,6 +450,16 @@ function App() {
                         >
                             <ChartBarIcon className="h-5 w-5 text-slate-600 dark:text-slate-400" />
                         </button>
+                        {isOnlineDuelAvailable && (
+                            <button
+                                onClick={() => setIsLeaderboardOpen(true)}
+                                className={headerButton}
+                                aria-label="Најдобри 10"
+                                title="Најдобри 10"
+                            >
+                                <TrophyIcon className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                            </button>
+                        )}
                         <button
                             onClick={() => setIsSettingsModalOpen(true)}
                             className={headerButton}
@@ -562,7 +606,27 @@ function App() {
                         setIsGameOverModalOpen(false)
                         setIsCalendarOpen(true)
                     }}
+                    isOnLeaderboard={leaderboardProfile.name !== null}
+                    onOpenLeaderboard={
+                        isOnlineDuelAvailable
+                            ? () => {
+                                  setIsGameOverModalOpen(false)
+                                  setIsLeaderboardOpen(true)
+                              }
+                            : undefined
+                    }
                 />
+                {isOnlineDuelAvailable && (
+                    <LeaderboardModal
+                        isOpen={isLeaderboardOpen}
+                        handleClose={() => setIsLeaderboardOpen(false)}
+                        year={leaderboardYear(todayDay)}
+                        playerId={playerId}
+                        name={leaderboardProfile.name}
+                        suggestedName={loadPlayerName()}
+                        onSaveName={saveLeaderboardName}
+                    />
+                )}
                 {recapYear !== null && (
                     <RecapModal
                         isOpen={isRecapOpen}

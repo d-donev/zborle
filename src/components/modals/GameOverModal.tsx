@@ -27,6 +27,9 @@ type Props = {
     onNewPracticeGame: () => void
     onSwitchToPractice: () => void
     onOpenCalendar: () => void
+    /** whether this device already counts its daily wins in the yearly top 10 */
+    isOnLeaderboard: boolean
+    onOpenLeaderboard?: () => void
 }
 
 const WIN_MESSAGES = ['Генијално!', 'Величествено!', 'Импресивно!', 'Одлично!', 'Браво!', 'Фуу, за малку!']
@@ -49,6 +52,8 @@ export const GameOverModal = ({
     onNewPracticeGame,
     onSwitchToPractice,
     onOpenCalendar,
+    isOnLeaderboard,
+    onOpenLeaderboard,
 }: Props) => {
     const title = isWon ? WIN_MESSAGES[Math.min(guesses.length, 6) - 1] : 'Следниот пат!'
     const meaningUrl = `https://www.google.com/search?q=${encodeURIComponent(`${solution.toLowerCase()} значење`)}`
@@ -101,6 +106,19 @@ export const GameOverModal = ({
                 </div>
 
                 {mode === 'daily' && !isArchive && <TimeLeft timeLeft={timeLeft} />}
+
+                {mode === 'daily' && !isArchive && isWon && onOpenLeaderboard && (
+                    <button
+                        type="button"
+                        onClick={onOpenLeaderboard}
+                        className="mt-3 w-full rounded-lg bg-amber-100 dark:bg-amber-900/40 px-3 py-2 text-sm font-medium text-amber-900 dark:text-amber-100 hover:brightness-95 transition"
+                    >
+                        🏆{' '}
+                        {isOnLeaderboard
+                            ? 'Погодокот е запишан во табелата · Види ја'
+                            : 'Влези во табелата на најдобрите 10'}
+                    </button>
+                )}
             </div>
 
             <div className="mt-4 space-y-2">
