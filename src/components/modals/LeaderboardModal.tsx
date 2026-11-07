@@ -17,7 +17,8 @@ type Props = {
     /** the name this device plays under, null until the player joins */
     name: string | null
     suggestedName: string
-    onSaveName: (name: string) => void
+    /** rejects with an error named NameTakenError when the name belongs to someone else */
+    onSaveName: (name: string) => Promise<void>
 }
 
 type State = { status: 'loading' | 'ready' | 'error'; top: RankedEntry[]; me: LeaderboardEntry | null }
@@ -57,6 +58,8 @@ export const LeaderboardModal = ({ isOpen, handleClose, year, playerId, name, su
     const [state, setState] = useState<State>({ status: 'loading', top: [], me: null })
     const [draft, setDraft] = useState('')
     const [isEditing, setIsEditing] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const [error, setError] = useState('')
 
     useEffect(() => {
         if (!isOpen) return
@@ -84,34 +87,59 @@ export const LeaderboardModal = ({ isOpen, handleClose, year, playerId, name, su
         if (isOpen) {
             setDraft(name ?? suggestedName)
             setIsEditing(false)
+            setError('')
         }
     }, [isOpen, name, suggestedName])
 
-    const submit = (e: FormEvent) => {
+    const submit = async (e: FormEvent) => {
         e.preventDefault()
         const clean = cleanName(draft)
-        if (!clean) return
-        onSaveName(clean)
-        setIsEditing(false)
+        if (!clean || isSaving) return
+        if (clean === name) {
+            setIsEditing(false)
+            return
+        }
+        setIsSaving(true)
+        setError('')
+        try {
+            await onSaveName(clean)
+            setIsEditing(false)
+        } catch (err) {
+            setError(
+                (err as Error).name === 'NameTakenError'
+                    ? `Името „${clean}“ е зафатено. Избери друго.`
+                    : 'Не успеавме да го зачуваме името. Обидете се повторно.',
+            )
+        } finally {
+            setIsSaving(false)
+        }
     }
 
     const { status, top, me } = state
     const meInTop = top.some((e) => e.id === playerId)
 
     const nameForm = (
-        <form onSubmit={submit} className="flex gap-2">
+        <form onSubmit={submit} className="flex flex-wrap gap-2">
             <input
-                className={inputClass}
+                className={`${inputClass} flex-1 min-w-0 w-auto`}
                 value={draft}
                 maxLength={NAME_MAX_LENGTH}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => {
+                    setDraft(e.target.value)
+                    setError('')
+                }}
                 placeholder="Твое име"
                 aria-label="Име за табелата"
                 autoFocus={isEditing}
             />
-            <button type="submit" className={buttonClass} disabled={!cleanName(draft)}>
-                {name ? 'Зачувај' : 'Влези'}
+            <button type="submit" className={buttonClass} disabled={!cleanName(draft) || isSaving}>
+                {isSaving ? '…' : name ? 'Зачувај' : 'Влези'}
             </button>
+            {error && (
+                <p role="alert" className="w-full text-sm text-red-600 dark:text-red-400">
+                    {error}
+                </p>
+            )}
         </form>
     )
 

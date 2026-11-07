@@ -376,19 +376,21 @@ function App() {
         import('./lib/leaderboardStore')
             .then((m) => m.submitSolvedDay(playerId, name, todayDay, todaySolvedIn))
             .then(() => setLeaderboardProfile((p) => ({ ...p, sentDay: todayDay })))
-            .catch(() => {
-                // offline or refused - tried again next time the app opens
+            .catch((e: Error) => {
+                if (e.name === 'NameTakenError') {
+                    // someone else holds this name (e.g. in the new year) - ask for another one
+                    setLeaderboardProfile((p) => ({ ...p, name: null }))
+                    showAlert('Твоето име во табелата е зафатено. Избери друго.', 'warning', 4000)
+                }
+                // otherwise offline or refused - tried again next time the app opens
             })
     }, [leaderboardProfile, todaySolvedIn, todayDay, playerId])
 
-    const saveLeaderboardName = (name: string) => {
-        const renamed = leaderboardProfile.name !== null && leaderboardProfile.name !== name
+    /** Reserves the name (names are unique); rejects with NameTakenError when it isn't free */
+    const saveLeaderboardName = async (name: string) => {
+        const m = await import('./lib/leaderboardStore')
+        await m.joinLeaderboard(playerId, name, leaderboardYear(todayDay))
         setLeaderboardProfile((p) => ({ ...p, name }))
-        if (renamed) {
-            import('./lib/leaderboardStore')
-                .then((m) => m.renamePlayer(playerId, name, leaderboardYear(todayDay)))
-                .catch(() => showAlert('Името не е зачувано. Обидете се повторно.'))
-        }
     }
 
     // Year-end greeting card (31 December - 7 January)

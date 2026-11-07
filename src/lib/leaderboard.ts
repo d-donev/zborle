@@ -6,6 +6,8 @@ import { dateFromDayNumber } from './archive'
  */
 export type LeaderboardEntry = {
     name: string
+    /** the reserved form of the name (see nameKey) - each one belongs to one player per year */
+    nameKey: string
     /** daily words solved this year */
     solved: number
     /** total guesses those words took */
@@ -25,7 +27,16 @@ export const leaderboardYear = (day: number) => dateFromDayNumber(day).year
 
 export const computeRank = (solved: number, tries: number) => solved * 10000 - tries
 
-export const cleanName = (name: string) => name.replace(/\s+/g, ' ').trim().slice(0, NAME_MAX_LENGTH)
+/** Characters the database doesn't allow in keys are dropped */
+export const cleanName = (name: string) =>
+    name
+        .replace(/[.#$[\]/]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, NAME_MAX_LENGTH)
+
+/** Names are unique regardless of case: "Марко" and "марко" are the same name */
+export const nameKey = (name: string) => cleanName(name).toLocaleLowerCase('mk')
 
 /** The entry after solving `day` in `tries` guesses, or null when that day is already counted */
 export const addSolvedDay = (
@@ -37,7 +48,7 @@ export const addSolvedDay = (
     if (current && current.lastDay >= day) return null
     const solved = (current?.solved ?? 0) + 1
     const total = (current?.tries ?? 0) + tries
-    return { name, solved, tries: total, lastDay: day, rank: computeRank(solved, total) }
+    return { name, nameKey: nameKey(name), solved, tries: total, lastDay: day, rank: computeRank(solved, total) }
 }
 
 export const sortEntries = (entries: RankedEntry[]) =>
