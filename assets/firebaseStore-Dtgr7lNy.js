@@ -1,4 +1,4 @@
-import{n as Ht,t as Tr}from"./index-DcFsuY85.js";var oi={};/**
+import{n as Ht,t as Tr}from"./index-B1bOB4e-.js";var oi={};/**
  * @license
  * Copyright 2017 Google LLC
  *
@@ -1637,4 +1637,4 @@ FIREBASE: `))}restoreState_(){this.tryAuth(),this.tryAppCheck();for(const e of t
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */class bh{constructor(e,t){this.committed=e,this.snapshot=t}toJSON(){return{committed:this.committed,snapshot:this.snapshot.toJSON()}}}function Sh(n,e,t){var i;if(n=Re(n),Fe("Reference.transaction",n._path),n.key===".length"||n.key===".keys")throw"Reference.transaction failed: "+n.key+" is a read-only object.";const s=(i=void 0)!==null&&i!==void 0?i:!0,r=new $,o=(l,c,u)=>{let h=null;l?r.reject(l):(h=new Te(u,new q(n._repo,n._path),T),r.resolve(new bh(c,h)))},a=ct(n,()=>{});return sh(n._repo,n._path,e,o,a,s),r.promise}j.prototype.simpleListen=function(n,e){this.sendRequest("q",{p:n},e)};j.prototype.echo=function(n,e){this.sendRequest("echo",{d:n},e)};wh();const Nh=n=>{const e=fs(n),t=Ch(e);let i=0;return ct(Le(t,".info/serverTimeOffset"),s=>{i=Number(s.val())||0}),{isOnline:!0,subscribe(s,r){return ct(Le(t,`duels/${s}`),o=>r(Ht(o.val())))},async transact(s,r){const o=await Sh(Le(t,`duels/${s}`),a=>{const l=r(Ht(a));if(l!==void 0)return l===null?null:Tr(l)});return o.committed?Ht(o.snapshot.val()):null},now:()=>Date.now()+i,trackPresence(s,r){const o=Le(t,`duels/${s}/players/${r}`),a=ct(Le(t,".info/connected"),l=>{l.val()===!0&&(Ji(o).update({online:!1,lastSeen:es()}),Zi(o,{online:!0}).catch(()=>{}))});return()=>{a(),Ji(o).cancel().catch(()=>{}),Zi(o,{online:!1,lastSeen:es()}).catch(()=>{})}}}};export{Nh as createFirebaseStore};
-//# sourceMappingURL=firebaseStore-BLPGF30U.js.map
+//# sourceMappingURL=firebaseStore-Dtgr7lNy.js.map
