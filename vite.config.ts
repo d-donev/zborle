@@ -7,12 +7,17 @@ import { VitePWA } from 'vite-plugin-pwa'
 const BASE_PATH = process.env.BASE_PATH ?? '/zborle/'
 
 // https://vite.dev/config/
-export default defineConfig(({ command }) => ({
-    base: command === 'build' ? BASE_PATH : '/',
+export default defineConfig(({ command, isPreview }) => ({
+    // `vite preview` serves the production build, so it needs the same base path
+    base: command === 'build' || isPreview ? BASE_PATH : '/',
     plugins: [
         react(),
         VitePWA({
+            // A new version takes over the cache as soon as it is downloaded; the app registers the
+            // service worker itself (see UpdatePrompt) so it can then ask players to refresh,
+            // instead of leaving them on an old version until every tab is closed.
             registerType: 'autoUpdate',
+            injectRegister: false,
             includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'safari-pinned-tab.svg'],
             manifest: {
                 name: 'Зборле',
@@ -36,6 +41,9 @@ export default defineConfig(({ command }) => ({
                 ],
             },
             workbox: {
+                // take over open tabs straight away (UpdatePrompt then offers the refresh)
+                skipWaiting: true,
+                clientsClaim: true,
                 globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
                 // the word lists make the main bundle fairly large
                 maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
