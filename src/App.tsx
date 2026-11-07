@@ -20,6 +20,8 @@ import { StatsModal } from './components/modals/StatsModals'
 import { Confetti } from './components/ui/Confetti'
 import { DuelGame } from './components/duel/DuelGame'
 import { CalendarModal } from './components/modals/CalendarModal'
+import { RecapModal } from './components/modals/RecapModal'
+import { getRecapYear } from './lib/recap'
 import {
     Archive,
     formatDay,
@@ -354,6 +356,10 @@ function App() {
 
     const playedDay = isArchive ? archiveDay! : todayDay
 
+    // Year-end greeting card (31 December - 7 January)
+    const recapYear = getRecapYear(todayDay)
+    const [isRecapOpen, setIsRecapOpen] = useState(false)
+
     const startNewPracticeGame = () => {
         if (isPractice && isGameInProgress) {
             // Skipping a word counts as a loss so practice stats stay honest
@@ -455,6 +461,21 @@ function App() {
                     )}
                 </div>
 
+                {recapYear !== null && (
+                    <button
+                        onClick={() => setIsRecapOpen(true)}
+                        className="mx-auto mb-4 flex w-[300px] items-center gap-3 rounded-xl bg-gradient-to-r from-amber-400 to-pink-500 px-4 py-2.5 text-left text-white shadow-md transition hover:brightness-105 active:scale-[0.99]"
+                    >
+                        <span className="text-2xl" aria-hidden="true">
+                            🎉
+                        </span>
+                        <span className="text-sm font-semibold leading-tight">
+                            Вашата Зборле {recapYear} честитка е спремна!
+                            <span className="block text-xs font-normal opacity-90">Направете ја и симнете ја</span>
+                        </span>
+                    </button>
+                )}
+
                 {isDuel ? (
                     <DuelGame
                         code={duelCode}
@@ -534,6 +555,16 @@ function App() {
                         setIsCalendarOpen(true)
                     }}
                 />
+                {recapYear !== null && (
+                    <RecapModal
+                        isOpen={isRecapOpen}
+                        handleClose={() => setIsRecapOpen(false)}
+                        year={recapYear}
+                        archive={archive}
+                        todayDay={todayDay}
+                        showAlert={showAlert}
+                    />
+                )}
                 <CalendarModal
                     isOpen={isCalendarOpen}
                     handleClose={() => setIsCalendarOpen(false)}
