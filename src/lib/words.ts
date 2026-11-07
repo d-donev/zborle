@@ -10,12 +10,24 @@ export const isWordInWordList = (word: string) => {
     return WORDS.includes(word.toLowerCase()) || VALID_GUESSES.includes(word.toLowerCase())
 }
 
-export const getWordOfDay = () => {
-    return WORDS[getWordOfDayIndex()].toUpperCase()
+export const getWordByIndex = (index: number) => {
+    return WORDS[index].toUpperCase()
 }
 
-export const isWinningWord = (word: string) => {
-    return getWordOfDay() === word
+export const getWordOfDay = () => {
+    return getWordByIndex(getWordOfDayIndex())
+}
+
+export const getRandomWord = (exclude?: string) => {
+    let word = getWordByIndex(Math.floor(Math.random() * WORDS.length))
+    while (exclude && word === exclude && WORDS.length > 1) {
+        word = getWordByIndex(Math.floor(Math.random() * WORDS.length))
+    }
+    return word
+}
+
+export const isWinningWord = (word: string, solution: string = getWordOfDay()) => {
+    return solution === word
 }
 
 export const getWordOfDayIndex = () => {

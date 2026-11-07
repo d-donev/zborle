@@ -58,11 +58,19 @@ export const AboutModal = ({ isOpen, handleClose }: Props) => {
                                         <p className="text-sm text-slate-600 dark:text-slate-300">
                                             Ова е игра со отворен изворен код на играта Wordle -{' '}
                                             <a
-                                                href="https://github.com/zborle/wordle"
+                                                href="https://github.com/d-donev/zborle"
                                                 className="underline font-bold text-green-600 dark:text-green-400"
                                             >
                                                 видете го кодот овде
                                             </a>{' '}
+                                            (базирано на{' '}
+                                            <a
+                                                href="https://github.com/zborle/wordle"
+                                                className="underline font-bold text-green-600 dark:text-green-400"
+                                            >
+                                                zborle/wordle
+                                            </a>
+                                            ){' '}
                                             и{' '}
                                             <a
                                                 href="https://www.powerlanguage.co.uk/wordle/"

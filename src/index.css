@@ -84,6 +84,52 @@
     --alert-warning-text: #fcd34d;
 }
 
+/* Tile colours - swapped to orange/blue in high-contrast (colour-blind friendly) mode */
+:root {
+    --tile-correct: #22c55e;
+    --tile-present: #eab308;
+    --tile-absent: #64748b;
+}
+
+.dark {
+    --tile-correct: #16a34a;
+    --tile-present: #ca8a04;
+    --tile-absent: #475569;
+}
+
+.high-contrast {
+    --tile-correct: #f5793a;
+    --tile-present: #3b9fe8;
+}
+
+.dark.high-contrast {
+    --tile-correct: #e8682a;
+    --tile-present: #2f86c9;
+}
+
+@layer components {
+    .tile-correct,
+    .tile-present,
+    .tile-absent {
+        color: #ffffff;
+    }
+    .tile-correct {
+        background-color: var(--tile-correct);
+        border-color: var(--tile-correct);
+    }
+    .tile-present {
+        background-color: var(--tile-present);
+        border-color: var(--tile-present);
+    }
+    .tile-absent {
+        background-color: var(--tile-absent);
+        border-color: var(--tile-absent);
+    }
+    .bg-tile-correct {
+        background-color: var(--tile-correct);
+    }
+}
+
 /* Smooth theme transitions */
 html {
     transition:

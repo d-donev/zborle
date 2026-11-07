@@ -9,10 +9,11 @@ type Props = {
     onDelete: () => void
     onEnter: () => void
     guesses: string[]
+    solution: string
 }
 
-export const Keyboard = ({ onChar, onDelete, onEnter, guesses }: Props) => {
-    const charStatuses = getStatuses(guesses)
+export const Keyboard = ({ onChar, onDelete, onEnter, guesses, solution }: Props) => {
+    const charStatuses = getStatuses(guesses, solution)
 
     const onClick = (value: KeyValue) => {
         if (value === 'ENTER') {
@@ -26,7 +27,11 @@ export const Keyboard = ({ onChar, onDelete, onEnter, guesses }: Props) => {
 
     useEffect(() => {
         const listener = (e: KeyboardEvent) => {
-            if (e.code === 'Enter') {
+            // Don't type into the grid while a dialog is open or a shortcut is used
+            if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector('[role="dialog"]')) {
+                return
+            }
+            if (e.code === 'Enter' || e.code === 'NumpadEnter') {
                 onEnter()
             } else if (e.code === 'Backspace') {
                 onDelete()

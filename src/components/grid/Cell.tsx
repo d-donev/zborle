@@ -31,12 +31,9 @@ export const Cell = ({ value, status, completed = false, delay = 0, invalid = fa
             'bg-white dark:bg-slate-800 border-slate-500 dark:border-slate-400 text-slate-900 dark:text-slate-100':
                 !status && value,
             // Completed states with colors
-            'bg-slate-500 dark:bg-slate-600 text-white border-slate-500 dark:border-slate-600':
-                status === 'absent' && showColor,
-            'bg-green-500 dark:bg-green-600 text-white border-green-500 dark:border-green-600':
-                status === 'correct' && showColor,
-            'bg-yellow-500 dark:bg-yellow-600 text-white border-yellow-500 dark:border-yellow-600':
-                status === 'present' && showColor,
+            'tile-absent': status === 'absent' && showColor,
+            'tile-correct': status === 'correct' && showColor,
+            'tile-present': status === 'present' && showColor,
             // Animations
             'pop-in': !status && value,
             'flip-in': animationState === AnimationState.FlipIn,

@@ -4,15 +4,18 @@ import './index.css'
 import App from './App'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { SoundProvider } from './contexts/SoundContext'
+import { SettingsProvider } from './contexts/SettingsContext'
 
 const root = createRoot(document.getElementById('root')!)
 
 root.render(
     <StrictMode>
         <ThemeProvider>
-            <SoundProvider>
-                <App />
-            </SoundProvider>
+            <SettingsProvider>
+                <SoundProvider>
+                    <App />
+                </SoundProvider>
+            </SettingsProvider>
         </ThemeProvider>
     </StrictMode>,
 )

@@ -35,9 +35,11 @@ export type CharValue =
     | 'Н'
     | 'М'
 
-export const getStatuses = (guesses: string[]): { [key: string]: CharStatus } => {
+export const getStatuses = (
+    guesses: string[],
+    solution: string = getWordOfDay(),
+): { [key: string]: CharStatus } => {
     const charObj: { [key: string]: CharStatus } = {}
-    const solution = getWordOfDay()
 
     guesses.forEach((word) => {
         word.split('').forEach((letter, i) => {
@@ -61,8 +63,7 @@ export const getStatuses = (guesses: string[]): { [key: string]: CharStatus } =>
     return charObj
 }
 
-export const getGuessStatuses = (guess: string): CharStatus[] => {
-    const solution = getWordOfDay()
+export const getGuessStatuses = (guess: string, solution: string = getWordOfDay()): CharStatus[] => {
     const splitSolution = solution.split('')
     const splitGuess = guess.split('')
 

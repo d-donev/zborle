@@ -113,7 +113,13 @@ export const InfoModal = ({ isOpen, handleClose }: Props) => {
 
                                     <p className="text-left text-base text-slate-600 dark:text-slate-300 mt-4 border-t-2 border-slate-200 dark:border-slate-600 pt-2">
                                         Нов <b className="text-slate-800 dark:text-slate-200">ЗБОРЛЕ</b> е достапен
-                                        секој ден.
+                                        секој ден. Сакате уште? Изберете{' '}
+                                        <b className="text-slate-800 dark:text-slate-200">Вежба</b> за неограничен број
+                                        зборови.
+                                    </p>
+                                    <p className="text-left text-sm text-slate-600 dark:text-slate-400 mt-2">
+                                        Во <b className="text-slate-800 dark:text-slate-200">Поставки</b> може да вклучите
+                                        тежок режим и висок контраст на боите.
                                     </p>
                                 </div>
                             </div>
