@@ -76,13 +76,31 @@ export const saveBoolean = (key: string, value: boolean) => {
     }
 }
 
-export type GameMode = 'daily' | 'practice'
+export type GameMode = 'daily' | 'practice' | 'duel'
 
 export const loadGameMode = (): GameMode => {
     try {
-        return localStorage.getItem('zborle-mode') === 'practice' ? 'practice' : 'daily'
+        const mode = localStorage.getItem('zborle-mode')
+        return mode === 'practice' || mode === 'duel' ? mode : 'daily'
     } catch {
         return 'daily'
+    }
+}
+
+export const loadDuelCode = () => {
+    try {
+        return localStorage.getItem('zborle-duel-code')
+    } catch {
+        return null
+    }
+}
+
+export const saveDuelCode = (code: string | null) => {
+    try {
+        if (code) localStorage.setItem('zborle-duel-code', code)
+        else localStorage.removeItem('zborle-duel-code')
+    } catch {
+        // ignore
     }
 }
 

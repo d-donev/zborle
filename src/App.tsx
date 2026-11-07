@@ -17,6 +17,8 @@ import { ShortcutsModal } from './components/modals/ShortcutsModal'
 import { SettingsModal } from './components/modals/SettingsModal'
 import { StatsModal } from './components/modals/StatsModals'
 import { Confetti } from './components/ui/Confetti'
+import { DuelGame } from './components/duel/DuelGame'
+import { isValidDuelCode } from './lib/duel/store'
 import { ThemeToggle } from './components/ui/ThemeToggle'
 import { SoundToggle } from './components/ui/SoundToggle'
 import {
@@ -29,7 +31,9 @@ import {
 } from './lib/words'
 import {
     GameMode,
+    loadDuelCode,
     loadGameMode,
+    saveDuelCode,
     loadGameStateFromLocalStorage,
     loadPracticeState,
     PracticeState,
@@ -64,6 +68,21 @@ const createPracticeGame = (exclude?: string): PracticeState => ({
     guesses: [],
 })
 
+const getDuelCodeFromUrl = () => {
+    const code = new URLSearchParams(window.location.search).get('duel')?.toUpperCase() ?? null
+    return isValidDuelCode(code) ? code : null
+}
+
+/** Keep ?duel=CODE in the address bar only while a duel is on screen */
+const syncDuelUrl = (code: string | null) => {
+    const url = new URL(window.location.href)
+    if (code) url.searchParams.set('duel', code)
+    else url.searchParams.delete('duel')
+    window.history.replaceState(null, '', url)
+}
+
+const MODE_LABELS: Record<GameMode, string> = { daily: 'Дневен', practice: 'Вежба', duel: 'Дуел' }
+
 const headerButton =
     'p-2 rounded-lg transition-all duration-200 hover:bg-slate-200 dark:hover:bg-slate-700 hover:scale-105 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400'
 
@@ -71,8 +90,9 @@ function App() {
     const { playSound } = useSound()
     const { isHardMode, isHighContrast } = useSettings()
 
-    const [isFirstVisit] = useState(() => loadGameStateFromLocalStorage() == null)
-    const [mode, setMode] = useState<GameMode>(loadGameMode)
+    const [isFirstVisit] = useState(() => loadGameStateFromLocalStorage() == null && !getDuelCodeFromUrl())
+    const [mode, setMode] = useState<GameMode>(() => (getDuelCodeFromUrl() ? 'duel' : loadGameMode()))
+    const [duelCode, setDuelCode] = useState<string | null>(() => getDuelCodeFromUrl() ?? loadDuelCode())
     const [dayIndex, setDayIndex] = useState(getWordOfDayIndex)
     const [dailyGuesses, setDailyGuesses] = useState<string[]>(() => {
         const loaded = loadGameStateFromLocalStorage()
@@ -104,13 +124,15 @@ function App() {
     const alertTimer = useRef<number | undefined>(undefined)
 
     const isPractice = mode === 'practice'
+    const isDuel = mode === 'duel'
     const solution = isPractice ? practice.solution : getWordByIndex(dayIndex)
     const guesses = isPractice ? practice.guesses : dailyGuesses
     const stats = isPractice ? practiceStats : dailyStats
     const isGameWon = guesses.includes(solution)
     const isGameLost = !isGameWon && guesses.length >= MAX_GUESSES
-    const isGameOver = isGameWon || isGameLost
-    const isGameInProgress = guesses.length > 0 && !isGameOver
+    // the duel screen runs its own game; these describe the daily/practice board
+    const isGameOver = !isDuel && (isGameWon || isGameLost)
+    const isGameInProgress = !isDuel && guesses.length > 0 && !isGameOver
 
     const setGuesses = (next: string[]) => {
         if (isPractice) {
@@ -145,7 +167,12 @@ function App() {
 
     useEffect(() => {
         saveGameMode(mode)
-    }, [mode])
+        syncDuelUrl(mode === 'duel' ? duelCode : null)
+    }, [mode, duelCode])
+
+    useEffect(() => {
+        saveDuelCode(duelCode)
+    }, [duelCode])
 
     // Countdown to the next word, and roll over to the new word at midnight
     useEffect(() => {
@@ -333,7 +360,7 @@ function App() {
                         aria-label="Режим на игра"
                         className="flex flex-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-semibold"
                     >
-                        {(['daily', 'practice'] as GameMode[]).map((m) => (
+                        {(['daily', 'practice', 'duel'] as GameMode[]).map((m) => (
                             <button
                                 key={m}
                                 role="tab"
@@ -346,7 +373,7 @@ function App() {
                                         : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200',
                                 )}
                             >
-                                {m === 'daily' ? `Дневен #${dayIndex}` : 'Вежба'}
+                                {MODE_LABELS[m]}
                             </button>
                         ))}
                     </div>
@@ -362,26 +389,35 @@ function App() {
                     )}
                 </div>
 
-                {isHardMode && (
-                    <p className="-mt-2 mb-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Тежок режим
-                    </p>
+                {isDuel ? (
+                    <DuelGame
+                        code={duelCode}
+                        onCodeChange={setDuelCode}
+                        onExit={() => switchMode('daily')}
+                        showAlert={showAlert}
+                    />
+                ) : (
+                    <>
+                        <p className="-mt-2 mb-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            {isPractice ? 'Вежба' : `Збор #${dayIndex}`}
+                            {isHardMode && ' · тежок режим'}
+                        </p>
+                        <Grid
+                            guesses={guesses}
+                            currentGuess={currentGuess}
+                            solution={solution}
+                            invalid={isRowInvalid}
+                            win={isWinAnimationStarted}
+                        />
+                        <Keyboard
+                            onChar={onChar}
+                            onDelete={onDelete}
+                            onEnter={onEnter}
+                            guesses={guesses}
+                            solution={solution}
+                        />
+                    </>
                 )}
-
-                <Grid
-                    guesses={guesses}
-                    currentGuess={currentGuess}
-                    solution={solution}
-                    invalid={isRowInvalid}
-                    win={isWinAnimationStarted}
-                />
-                <Keyboard
-                    onChar={onChar}
-                    onDelete={onDelete}
-                    onEnter={onEnter}
-                    guesses={guesses}
-                    solution={solution}
-                />
 
                 {isGameOver && !isGameOverModalOpen && (
                     <div className="mt-4 flex justify-center">

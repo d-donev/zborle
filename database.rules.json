@@ -1,0 +1,13 @@
+{
+    "rules": {
+        ".read": false,
+        ".write": false,
+        "duels": {
+            "$code": {
+                ".read": true,
+                ".write": "$code.matches(/^[A-Z0-9]{5}$/)",
+                ".validate": "!newData.exists() || newData.child('players/host/id').isString()"
+            }
+        }
+    }
+}

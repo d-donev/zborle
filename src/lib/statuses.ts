@@ -1,4 +1,5 @@
 import { getWordOfDay } from './words'
+import { TIMEOUT_GUESS } from './duel/types'
 
 export type CharStatus = 'absent' | 'present' | 'correct'
 
@@ -42,6 +43,7 @@ export const getStatuses = (
     const charObj: { [key: string]: CharStatus } = {}
 
     guesses.forEach((word) => {
+        if (word === TIMEOUT_GUESS) return
         word.split('').forEach((letter, i) => {
             if (!solution.includes(letter)) {
                 // make status absent

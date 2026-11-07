@@ -1,0 +1,102 @@
+import { describe, expect, it } from 'vitest'
+import {
+    createDuel,
+    getMatchWinner,
+    getTurnDeadline,
+    joinDuel,
+    rematch,
+    setReady,
+    submitGuess,
+} from './logic'
+import { Duel, TIMEOUT_GUESS, TURN_MS } from './types'
+
+const WORD = 'ЗВОНО'
+const pick = () => WORD
+
+const startedDuel = (target = 1): Duel => {
+    let d: Duel | undefined = createDuel('ABCDE', target, { id: 'h', name: 'Ана' }, 0)
+    d = joinDuel(d, { id: 'g', name: 'Боне' })!
+    d = setReady(d, 'host', 100, pick)!
+    d = setReady(d, 'guest', 200, pick)!
+    return d
+}
+
+describe('duel setup', () => {
+    it('lets one guest join and keeps others out', () => {
+        const d = joinDuel(createDuel('X', 1, { id: 'h', name: 'A' }, 0), { id: 'g', name: 'B' })!
+        expect(d.players.guest?.id).toBe('g')
+        expect(joinDuel(d, { id: 'z', name: 'C' })).toBeUndefined()
+        expect(joinDuel(d, { id: 'g', name: 'B' })).toBe(d)
+    })
+
+    it('starts a round with a countdown only when both are ready', () => {
+        let d: Duel | undefined = joinDuel(createDuel('X', 1, { id: 'h', name: 'A' }, 0), { id: 'g', name: 'B' })
+        d = setReady(d!, 'host', 100, pick)!
+        expect(d.round).toBeUndefined()
+        d = setReady(d, 'guest', 200, pick)!
+        expect(d.round).toMatchObject({ number: 1, solution: WORD, startsAt: 3200 })
+        expect(d.ready).toEqual({ host: false, guest: false })
+    })
+})
+
+describe('round result', () => {
+    it('ignores guesses during the countdown', () => {
+        expect(submitGuess(startedDuel(), 'host', WORD, 1000)).toBeUndefined()
+    })
+
+    it('gives the round to whoever guesses first', () => {
+        let d = startedDuel()
+        d = submitGuess(d, 'guest', 'КВАРЦ', 4000)!
+        d = submitGuess(d, 'host', WORD, 5000)!
+        expect(d.round?.result).toBe('host')
+        expect(d.score).toEqual({ host: 1, guest: 0 })
+        // the round is over, the other player can't guess any more
+        expect(submitGuess(d, 'guest', WORD, 6000)).toBeUndefined()
+    })
+
+    it('lets the other player win if the first one runs out of tries', () => {
+        let d = startedDuel()
+        for (let i = 0; i < 6; i++) d = submitGuess(d, 'host', 'КВАРЦ', 4000 + i)!
+        expect(d.round?.result).toBeUndefined()
+        d = submitGuess(d, 'guest', WORD, 9000)!
+        expect(d.round?.result).toBe('guest')
+    })
+
+    it('is a draw with no points when both miss', () => {
+        let d = startedDuel()
+        for (let i = 0; i < 6; i++) {
+            d = submitGuess(d, 'host', 'КВАРЦ', 4000 + i)!
+            d = submitGuess(d, 'guest', TIMEOUT_GUESS, 4000 + i)!
+        }
+        expect(d.round?.result).toBe('draw')
+        expect(d.score).toEqual({ host: 0, guest: 0 })
+    })
+
+    it('restarts the one-minute timer after every guess', () => {
+        let d = startedDuel()
+        expect(getTurnDeadline(d, 'host')).toBe(3200 + TURN_MS)
+        d = submitGuess(d, 'host', 'КВАРЦ', 10_000)!
+        expect(getTurnDeadline(d, 'host')).toBe(10_000 + TURN_MS)
+        expect(getTurnDeadline(d, 'guest')).toBe(3200 + TURN_MS)
+    })
+})
+
+describe('match', () => {
+    it('ends at the target number of wins and can be replayed', () => {
+        let d = startedDuel(3)
+        for (let round = 0; round < 3; round++) {
+            if (round > 0) {
+                d = setReady(d, 'host', 0, pick)!
+                d = setReady(d, 'guest', 0, pick)!
+            }
+            d = submitGuess(d, 'guest', WORD, d.round!.startsAt + 1)!
+        }
+        expect(d.score.guest).toBe(3)
+        expect(getMatchWinner(d)).toBe('guest')
+        expect(setReady(d, 'host', 0, pick)).toBeUndefined()
+
+        const again = rematch(d)!
+        expect(again.score).toEqual({ host: 0, guest: 0 })
+        expect(again.round).toBeUndefined()
+    })
+})
