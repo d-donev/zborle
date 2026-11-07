@@ -5,7 +5,7 @@ import { dayNumberFromDate } from './archive'
 describe('leaderboard', () => {
     it('counts each solved day once', () => {
         const first = addSolvedDay(null, 'Ана', 100, 3)!
-        expect(first).toEqual({ name: 'Ана', nameKey: 'ана', solved: 1, tries: 3, lastDay: 100, rank: computeRank(1, 3) })
+        expect(first).toEqual({ name: 'Ана', nameKey: 'ana', solved: 1, tries: 3, lastDay: 100, rank: computeRank(1, 3) })
         expect(addSolvedDay(first, 'Ана', 100, 2)).toBeNull()
         expect(addSolvedDay(first, 'Ана', 99, 2)).toBeNull()
         const second = addSolvedDay(first, 'Ана', 101, 5)!
@@ -37,6 +37,9 @@ describe('leaderboard', () => {
         expect(cleanName('  Марко   Петров  ')).toBe('Марко Петров')
         expect(cleanName('x'.repeat(30))).toHaveLength(20)
         expect(cleanName('a.b#c$d[e]f/g')).toBe('abcdefg')
-        expect(nameKey(' Марко  ПЕТРОВ ')).toBe('марко петров')
+        expect(nameKey(' Марко  ПЕТРОВ ')).toBe('markopetrov')
+        expect(nameKey('Тестер')).toBe(nameKey('Tester'))
+        expect(nameKey('Ѓорѓи Џоџо')).toBe(nameKey('Gjorgji Dzhodzho'.replace('Dzh', 'Dj').replace('dzh', 'dj')))
+        expect(nameKey('Жарко Шкоќ')).toBe(nameKey('Žarko Škoć'))
     })
 })

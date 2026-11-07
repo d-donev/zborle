@@ -21,7 +21,12 @@ type Props = {
     onSaveName: (name: string) => Promise<void>
 }
 
-type State = { status: 'loading' | 'ready' | 'error'; top: RankedEntry[]; me: LeaderboardEntry | null }
+type State = {
+    status: 'loading' | 'ready' | 'error'
+    top: RankedEntry[]
+    me: LeaderboardEntry | null
+    myPlace: number | null
+}
 
 const MEDALS = ['🥇', '🥈', '🥉']
 
@@ -55,7 +60,7 @@ const Row = ({ place, entry, isMe }: { place: number | null; entry: LeaderboardE
 )
 
 export const LeaderboardModal = ({ isOpen, handleClose, year, playerId, name, suggestedName, onSaveName }: Props) => {
-    const [state, setState] = useState<State>({ status: 'loading', top: [], me: null })
+    const [state, setState] = useState<State>({ status: 'loading', top: [], me: null, myPlace: null })
     const [draft, setDraft] = useState('')
     const [isEditing, setIsEditing] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
@@ -72,7 +77,7 @@ export const LeaderboardModal = ({ isOpen, handleClose, year, playerId, name, su
                 stop = m.watchLeaderboard(
                     year,
                     playerId,
-                    (top, me) => setState({ status: 'ready', top, me }),
+                    (top, me, myPlace) => setState({ status: 'ready', top, me, myPlace }),
                     () => setState((s) => ({ ...s, status: 'error' })),
                 )
             })
@@ -115,7 +120,7 @@ export const LeaderboardModal = ({ isOpen, handleClose, year, playerId, name, su
         }
     }
 
-    const { status, top, me } = state
+    const { status, top, me, myPlace } = state
     const meInTop = top.some((e) => e.id === playerId)
 
     const nameForm = (
@@ -168,7 +173,14 @@ export const LeaderboardModal = ({ isOpen, handleClose, year, playerId, name, su
                         {top.map((entry, i) => (
                             <Row key={entry.id} place={i + 1} entry={entry} isMe={entry.id === playerId} />
                         ))}
-                        {me && !meInTop && <Row place={null} entry={me} isMe />}
+                        {me && !meInTop && (
+                            <>
+                                <li aria-hidden="true" className="text-center text-slate-400 leading-none">
+                                    ⋮
+                                </li>
+                                <Row place={myPlace} entry={me} isMe />
+                            </>
+                        )}
                     </ol>
                 )}
             </div>
@@ -184,16 +196,31 @@ export const LeaderboardModal = ({ isOpen, handleClose, year, playerId, name, su
                 ) : isEditing ? (
                     nameForm
                 ) : (
-                    <p className="text-sm text-slate-700 dark:text-slate-300">
-                        Играш како <span className="font-semibold">{name}</span>.{' '}
-                        <button
-                            type="button"
-                            className="font-medium underline underline-offset-2 hover:text-slate-900 dark:hover:text-white"
-                            onClick={() => setIsEditing(true)}
-                        >
-                            Промени име
-                        </button>
-                    </p>
+                    <>
+                        {status === 'ready' && (
+                            <p className="mb-2 text-base text-slate-900 dark:text-slate-100">
+                                {me ? (
+                                    <>
+                                        Твое место: <span className="font-bold">{myPlace ? `${myPlace}.` : '…'}</span>
+                                        {' · '}
+                                        {wordsLabel(me.solved)} · просек {averageTries(me)}
+                                    </>
+                                ) : (
+                                    'Сè уште немаш погодок во табелата. Погоди го денешниот збор!'
+                                )}
+                            </p>
+                        )}
+                        <p className="text-sm text-slate-700 dark:text-slate-300">
+                            Играш како <span className="font-semibold">{name}</span>.{' '}
+                            <button
+                                type="button"
+                                className="font-medium underline underline-offset-2 hover:text-slate-900 dark:hover:text-white"
+                                onClick={() => setIsEditing(true)}
+                            >
+                                Промени име
+                            </button>
+                        </p>
+                    </>
                 )}
             </div>
         </BaseModal>
