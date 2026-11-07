@@ -37,21 +37,27 @@ export const RecapModal = ({ isOpen, handleClose, year, archive, todayDay, showA
 
     const fileName = `zborle-${year}-${displayName.replace(/[^\p{L}\p{N}]+/gu, '-').toLowerCase()}.png`
 
+    // (toBlob reports back through its callback, so the promise waits for it)
     const getBlob = () =>
-        new Promise<Blob | null>((resolve) => canvasRef.current?.toBlob(resolve, 'image/png') ?? resolve(null))
+        new Promise<Blob | null>((resolve) => {
+            const canvas = canvasRef.current
+            if (!canvas) return resolve(null)
+            canvas.toBlob(resolve, 'image/png')
+        })
 
     const download = async () => {
         savePlayerName(name.trim())
         const blob = await getBlob()
-        if (!blob) return showAlert('Не успеавме да ја создадеме сликата')
-        const url = URL.createObjectURL(blob)
+        // the preview image is a ready-made PNG too, so it works as a fallback
+        const url = blob ? URL.createObjectURL(blob) : imageUrl
+        if (!url) return showAlert('Не успеавме да ја создадеме сликата')
         const link = document.createElement('a')
         link.href = url
         link.download = fileName
         document.body.appendChild(link)
         link.click()
         link.remove()
-        window.setTimeout(() => URL.revokeObjectURL(url), 5000)
+        if (blob) window.setTimeout(() => URL.revokeObjectURL(url), 5000)
     }
 
     const file = () => getBlob().then((blob) => (blob ? new File([blob], fileName, { type: 'image/png' }) : null))
