@@ -42,8 +42,27 @@ export const Keyboard = ({ onChar, onDelete, onEnter, guesses, solution }: Props
                 }
             }
         }
+        // A button clicked just before typing (theme, tabs, a key on screen...) keeps the focus, and
+        // the browser would "click" it again on Enter or Space. While the board is up these keys
+        // belong to the game, so the browser's default is cancelled and the focus let go.
+        const stopButtonActivation = (e: KeyboardEvent) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return
+            const active = document.activeElement as HTMLElement | null
+            if (
+                !active ||
+                active === document.body ||
+                active.matches('input, textarea, select, [contenteditable="true"]') ||
+                active.closest('[role="dialog"]')
+            ) {
+                return
+            }
+            e.preventDefault()
+            active.blur()
+        }
+        window.addEventListener('keydown', stopButtonActivation, true)
         window.addEventListener('keyup', listener)
         return () => {
+            window.removeEventListener('keydown', stopButtonActivation, true)
             window.removeEventListener('keyup', listener)
         }
     }, [onEnter, onDelete, onChar])
