@@ -10,11 +10,14 @@ import { convert, LETTERS_EN } from '../../lib/keyboard'
 import { getRandomWord, isWordInWordList } from '../../lib/words'
 import {
     createDuel,
+    expireTurn,
     getMatchWinner,
     getRole,
     getTurnDeadline,
     isBoardDone,
+    isDuelExpired,
     joinDuel,
+    leaveDuel,
     rematch,
     setReady,
     submitGuess,
@@ -28,7 +31,7 @@ import {
     loadPlayerName,
     savePlayerName,
 } from '../../lib/duel/store'
-import { Duel, otherRole, Role, TIMEOUT_GUESS, TURN_MS, WORD_LENGTH } from '../../lib/duel/types'
+import { Duel, OPPONENT_GRACE_MS, otherRole, Role, TURN_MS, WORD_LENGTH } from '../../lib/duel/types'
 
 type AlertVariant = 'success' | 'warning' | 'error'
 
@@ -89,6 +92,7 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
     useEffect(() => {
         if (!store || !code) return
         setIsLoaded(false)
+        setExpiryCheckedFor(null)
         return store.subscribe(code, (d) => {
             setDuel(d)
             setIsLoaded(true)
@@ -97,9 +101,23 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
 
     const role: Role | null = duel ? getRole(duel, playerId) : null
 
+    // When a link is opened, a duel whose players have all been gone for 10+ minutes is deleted.
+    // This runs before we mark ourselves online, so our own return can't keep a dead duel alive.
+    const [expiryCheckedFor, setExpiryCheckedFor] = useState<string | null>(null)
     useEffect(() => {
-        if (store && code && role) return store.trackPresence(code, role)
-    }, [store, code, role])
+        if (!store || !code || !isLoaded || expiryCheckedFor === code) return
+        if (!duel || !isDuelExpired(duel, store.now())) {
+            setExpiryCheckedFor(code)
+            return
+        }
+        store
+            .transact(code, (d) => (d && isDuelExpired(d, store.now()) ? null : undefined))
+            .finally(() => setExpiryCheckedFor(code))
+    }, [store, code, isLoaded, duel, expiryCheckedFor])
+
+    useEffect(() => {
+        if (store && code && role && expiryCheckedFor === code) return store.trackPresence(code, role)
+    }, [store, code, role, expiryCheckedFor])
 
     useEffect(() => {
         if (!store) return
@@ -148,7 +166,7 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
         }
     }, [round?.result, round?.number, role])
 
-    const transact = async (fn: (d: Duel | null) => Duel | undefined) => {
+    const transact = async (fn: (d: Duel | null) => Duel | null | undefined) => {
         if (!store || !code) return null
         setIsBusy(true)
         try {
@@ -173,16 +191,29 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
     typedRef.current = currentGuess
     const firedDeadline = useRef(0)
     useEffect(() => {
-        if (!isPlaying || myDone || !role || msLeft > 0 || firedDeadline.current === deadline) return
+        if (!isPlaying || myDone || !role || !store || msLeft > 0 || firedDeadline.current === deadline) return
         firedDeadline.current = deadline
         const typed = typedRef.current
-        const isValid = typed.length === WORD_LENGTH && isWordInWordList(typed)
-        if (!isValid) {
-            showAlert('Времето истече! Го изгубивте обидот', 'warning')
-            vibrate(150)
+        if (typed.length === WORD_LENGTH && isWordInWordList(typed)) {
+            sendGuess(typed)
+            return
         }
-        sendGuess(isValid ? typed : TIMEOUT_GUESS)
-    },[isPlaying, myDone, msLeft, deadline, role])
+        showAlert('Времето истече! Го изгубивте обидот', 'warning')
+        vibrate(150)
+        setCurrentGuess('')
+        transact((d) => expireTurn(d, role, store.now()))
+    }, [isPlaying, myDone, msLeft, deadline, role])
+
+    // If the opponent walks away mid-round, their screen can't use up their tries - so ours does
+    // (a few seconds late, giving their own screen the chance to send a typed word first)
+    const opponentDeadline = duel && opponentRole ? getTurnDeadline(duel, opponentRole) : 0
+    const firedOpponentDeadline = useRef(0)
+    useEffect(() => {
+        if (!isPlaying || !store || !code || !opponentRole || opponent?.left || isBoardDone(opponentBoard)) return
+        if (now < opponentDeadline + OPPONENT_GRACE_MS || firedOpponentDeadline.current === opponentDeadline) return
+        firedOpponentDeadline.current = opponentDeadline
+        store.transact(code, (d) => expireTurn(d, opponentRole, store.now())).catch(() => {})
+    }, [isPlaying, now, opponentDeadline, opponentRole])
 
     const rejectGuess = (message: string) => {
         showAlert(message)
@@ -266,7 +297,10 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
         }
     }
 
-    const leave = () => {
+    const leave = async () => {
+        if (role) {
+            await transact((d) => leaveDuel(d, role))
+        }
         onCodeChange(null)
         onExit()
     }
@@ -326,7 +360,10 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
     if (!duel) {
         return (
             <div className={card}>
-                <p className="text-center font-semibold">Овој дуел не постои или е избришан.</p>
+                <p className="text-center font-semibold">Овој дуел заврши или не постои.</p>
+                <p className="mt-1 text-center text-sm text-slate-500 dark:text-slate-400">
+                    Дуелите се бришат кога двајцата ќе излезат.
+                </p>
                 <button className={`${primaryButton} mt-4`} onClick={() => onCodeChange(null)}>
                     Создај нов дуел
                 </button>
@@ -401,6 +438,32 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
         )
     }
 
+    const matches = duel.matches ?? { host: 0, guest: 0 }
+    const matchesPlayed = matches.host + matches.guest
+    const matchTally = (
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+            Вкупно дуели:{' '}
+            <b className="tabular-nums">
+                {me.name} {matches[role]} : {matches[opponentRole!]} {opponent.name}
+            </b>
+        </p>
+    )
+
+    // ── Someone pressed "leave" ──
+    if (me.left || opponent.left) {
+        return (
+            <div className={card}>
+                <p className="text-center text-lg font-bold">
+                    {me.left ? 'Го напуштивте овој дуел.' : `${opponent.name} го напушти дуелот.`}
+                </p>
+                <div className="text-center">{matchesPlayed > 0 && matchTally}</div>
+                <button className={`${primaryButton} mt-4`} onClick={me.left ? () => onCodeChange(null) : leave}>
+                    {me.left ? 'Создај нов дуел' : 'Излези'}
+                </button>
+            </div>
+        )
+    }
+
     const amReady = !!duel.ready?.[role]
     const opponentReady = !!(opponentRole && duel.ready?.[opponentRole])
     const solution = round?.solution ?? ''
@@ -419,6 +482,11 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
                 <div className="text-center text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     до {duel.target}
                     {round && <div className="text-xs font-semibold normal-case">рунда {round.number}</div>}
+                    {matchesPlayed > 0 && (
+                        <div className="text-xs font-semibold normal-case" title="Добиени дуели, вкупно со реваншите">
+                            дуели {matches[role]}:{matches[opponentRole!]}
+                        </div>
+                    )}
                 </div>
                 <div className="flex-1 min-w-0 text-right">
                     <p className="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">
@@ -494,6 +562,7 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
                                 {matchWinner === role ? 'Го добивте дуелот!' : `${opponent.name} го доби дуелот`}{' '}
                                 {duel.score[role]}:{duel.score[opponentRole!]}
                             </p>
+                            {matchTally}
                             <button
                                 className={`${primaryButton} mt-3`}
                                 onClick={() => transact((d) => rematch(d))}

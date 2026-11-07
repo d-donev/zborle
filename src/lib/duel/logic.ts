@@ -3,10 +3,12 @@ import {
     Duel,
     DuelBoard,
     DuelPlayer,
+    DUEL_EXPIRY_MS,
     MAX_GUESSES,
     otherRole,
     Role,
     RoundResult,
+    TIMEOUT_GUESS,
     TURN_MS,
 } from './types'
 
@@ -87,6 +89,43 @@ export const submitGuess = (duel: Duel | null, role: Role, guess: string, now: n
 }
 
 /**
+ * Uses up a try whose minute has run out. Either player's screen may call it, so a player who
+ * walks away keeps losing a try every minute and the round can't get stuck waiting for them.
+ * The next minute counts from the missed deadline, not from when this happened to run.
+ */
+export const expireTurn = (duel: Duel | null, role: Role, now: number): Duel | undefined => {
+    if (!duel?.round || duel.round.result || now < duel.round.startsAt) return undefined
+    const board = duel.boards?.[role] ?? emptyBoard(duel.round.startsAt)
+    if (isBoardDone(board)) return undefined
+    const deadline = getTurnDeadline(duel, role)
+    if (now < deadline) return undefined
+
+    const nextBoard: DuelBoard = { ...board, guesses: [...board.guesses, TIMEOUT_GUESS], lastAt: deadline }
+    return resolveRound({ ...duel, boards: { ...duel.boards, [role]: nextBoard } })
+}
+
+/**
+ * A player presses "leave". The first one is only marked as gone (the other sees a message);
+ * once nobody is left, the duel is deleted (null) and its link stops working.
+ */
+export const leaveDuel = (duel: Duel | null, role: Role): Duel | null | undefined => {
+    if (!duel) return undefined
+    const me = duel.players[role]
+    const other = duel.players[otherRole(role)]
+    if (!me) return undefined
+    if (!other || other.left) return null
+    return { ...duel, players: { ...duel.players, [role]: { ...me, left: true } } }
+}
+
+/** Every player has left or has been offline for more than 10 minutes */
+export const isDuelExpired = (duel: Duel, now: number) => {
+    const seated = [duel.players.host, duel.players.guest].filter((p): p is DuelPlayer => !!p)
+    return seated.every(
+        (p) => p.left || (p.online === false && p.lastSeen !== undefined && now - p.lastSeen > DUEL_EXPIRY_MS),
+    )
+}
+
+/**
  * Decides the round as soon as possible:
  * - the first player to guess the word wins (even if the other one is still playing)
  * - if both use all 6 tries without guessing, it's a draw and nobody scores
@@ -115,7 +154,16 @@ export const resolveRound = (duel: Duel): Duel => {
     if (result !== 'draw') {
         score[result] += 1
     }
-    return { ...duel, score, round: { ...duel.round, result } }
+    const next: Duel = { ...duel, score, round: { ...duel.round, result } }
+
+    // A won match goes on the tally that survives rematches
+    const matchWinner = getMatchWinner(next)
+    if (matchWinner) {
+        const matches = { host: 0, guest: 0, ...duel.matches }
+        matches[matchWinner] += 1
+        next.matches = matches
+    }
+    return next
 }
 
 /** Start the match over with the same two players */

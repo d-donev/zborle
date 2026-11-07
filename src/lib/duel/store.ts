@@ -7,8 +7,11 @@ import { Duel, DuelBoard, Role } from './types'
 export interface DuelStore {
     readonly isOnline: boolean
     subscribe(code: string, onChange: (duel: Duel | null) => void): () => void
-    /** Atomically replaces the duel with fn(current); returning undefined leaves it untouched */
-    transact(code: string, fn: (current: Duel | null) => Duel | undefined): Promise<Duel | null>
+    /**
+     * Atomically replaces the duel with fn(current). Returning undefined leaves it untouched,
+     * returning null deletes it.
+     */
+    transact(code: string, fn: (current: Duel | null) => Duel | null | undefined): Promise<Duel | null>
     /** Clock shared by both players (server time when online) */
     now(): number
     /** Marks the player online now and offline when they disconnect */
@@ -54,6 +57,7 @@ export const normalizeDuel = (raw: unknown): Duel | null => {
         ...d,
         players: { host: d.players.host, guest: d.players.guest?.id ? d.players.guest : undefined },
         score: { host: d.score?.host ?? 0, guest: d.score?.guest ?? 0 },
+        matches: { host: d.matches?.host ?? 0, guest: d.matches?.guest ?? 0 },
         boards: d.boards ? { host: board(d.boards.host), guest: board(d.boards.guest) } : undefined,
     }
 }
@@ -90,7 +94,8 @@ const createLocalStore = (): DuelStore => {
         async transact(code, fn) {
             const next = fn(read(code))
             if (next === undefined) return null
-            localStorage.setItem(localKey(code), JSON.stringify(toStorable(next)))
+            if (next === null) localStorage.removeItem(localKey(code))
+            else localStorage.setItem(localKey(code), JSON.stringify(toStorable(next)))
             window.dispatchEvent(new CustomEvent(LOCAL_EVENT, { detail: code }))
             return next
         },

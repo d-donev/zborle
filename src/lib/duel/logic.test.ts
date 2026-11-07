@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
     createDuel,
+    expireTurn,
     getMatchWinner,
     getTurnDeadline,
+    isDuelExpired,
     joinDuel,
+    leaveDuel,
     rematch,
     setReady,
     submitGuess,
@@ -98,5 +101,67 @@ describe('match', () => {
         const again = rematch(d)!
         expect(again.score).toEqual({ host: 0, guest: 0 })
         expect(again.round).toBeUndefined()
+    })
+
+    it('keeps a tally of matches across rematches', () => {
+        let d = startedDuel(1)
+        d = submitGuess(d, 'host', WORD, d.round!.startsAt + 1)!
+        expect(d.matches).toEqual({ host: 1, guest: 0 })
+        d = rematch(d)!
+        d = setReady(d, 'host', 0, pick)!
+        d = setReady(d, 'guest', 0, pick)!
+        d = submitGuess(d, 'guest', WORD, d.round!.startsAt + 1)!
+        expect(d.matches).toEqual({ host: 1, guest: 1 })
+        d = rematch(d)!
+        expect(d.matches).toEqual({ host: 1, guest: 1 })
+    })
+})
+
+describe('missed turns', () => {
+    it('uses up one try per missed minute, counted from each deadline', () => {
+        let d = startedDuel()
+        const start = d.round!.startsAt
+        expect(expireTurn(d, 'guest', start + TURN_MS - 1)).toBeUndefined()
+        // away for over three minutes: three tries are gone
+        const now = start + 3 * TURN_MS + 500
+        for (let i = 0; i < 3; i++) d = expireTurn(d, 'guest', now)!
+        expect(d.boards!.guest!.guesses).toEqual([TIMEOUT_GUESS, TIMEOUT_GUESS, TIMEOUT_GUESS])
+        expect(expireTurn(d, 'guest', now)).toBeUndefined()
+        expect(getTurnDeadline(d, 'guest')).toBe(start + 4 * TURN_MS)
+    })
+
+    it('ends the round even if the absent player never comes back', () => {
+        let d = startedDuel()
+        for (let i = 0; i < 6; i++) d = submitGuess(d, 'host', 'КВАРЦ', 4000 + i)!
+        for (let i = 0; i < 6; i++) d = expireTurn(d, 'guest', 10 * TURN_MS)!
+        expect(d.round?.result).toBe('draw')
+    })
+})
+
+describe('leaving and expiry', () => {
+    it('marks the first player as gone and deletes the duel when the second leaves', () => {
+        let d: Duel | null | undefined = startedDuel()
+        d = leaveDuel(d, 'host')
+        expect(d?.players.host.left).toBe(true)
+        expect(leaveDuel(d!, 'guest')).toBeNull()
+    })
+
+    it('deletes a duel nobody joined when the host leaves', () => {
+        expect(leaveDuel(createDuel('X', 1, { id: 'h', name: 'A' }, 0), 'host')).toBeNull()
+    })
+
+    it('expires only when everybody has been away for over 10 minutes', () => {
+        const d = startedDuel()
+        const away = (lastSeen: number) => ({ online: false, lastSeen })
+        const withPlayers = (host: object, guest: object): Duel => ({
+            ...d,
+            players: { host: { ...d.players.host, ...host }, guest: { ...d.players.guest!, ...guest } },
+        })
+        const now = 100 * 60_000
+        expect(isDuelExpired(withPlayers(away(0), away(0)), now)).toBe(true)
+        expect(isDuelExpired(withPlayers(away(0), { online: true }), now)).toBe(false)
+        expect(isDuelExpired(withPlayers(away(now - 5 * 60_000), away(0)), now)).toBe(false)
+        // local test mode has no presence information, so it never expires
+        expect(isDuelExpired(d, now)).toBe(false)
     })
 })
