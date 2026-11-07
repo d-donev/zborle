@@ -1,5 +1,6 @@
 import {
     ArrowPathIcon,
+    CalendarDaysIcon,
     ChartBarIcon,
     Cog6ToothIcon,
     InformationCircleIcon,
@@ -18,6 +19,16 @@ import { SettingsModal } from './components/modals/SettingsModal'
 import { StatsModal } from './components/modals/StatsModals'
 import { Confetti } from './components/ui/Confetti'
 import { DuelGame } from './components/duel/DuelGame'
+import { CalendarModal } from './components/modals/CalendarModal'
+import {
+    Archive,
+    formatDay,
+    formatDayShort,
+    getTodayDayNumber,
+    getWordForDay,
+    loadArchive,
+    saveArchive,
+} from './lib/archive'
 import { isValidDuelCode } from './lib/duel/store'
 import { ThemeToggle } from './components/ui/ThemeToggle'
 import { SoundToggle } from './components/ui/SoundToggle'
@@ -122,11 +133,26 @@ function App() {
         variant: 'error',
     })
     const alertTimer = useRef<number | undefined>(undefined)
+    /** the game that just ended with a guess made now (not one that was already over) */
+    const [justFinishedGame, setJustFinishedGame] = useState<string | null>(null)
+    /** games whose result dialog has already popped up once */
+    const shownResults = useRef(new Set<string>())
+
+    // Past days from the calendar (this year only); today is still the normal daily game
+    const [archive, setArchive] = useState<Archive>(loadArchive)
+    const [archiveDay, setArchiveDay] = useState<number | null>(null)
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+    const todayDay = getTodayDayNumber()
 
     const isPractice = mode === 'practice'
     const isDuel = mode === 'duel'
-    const solution = isPractice ? practice.solution : getWordByIndex(dayIndex)
-    const guesses = isPractice ? practice.guesses : dailyGuesses
+    const isArchive = mode === 'daily' && archiveDay !== null && archiveDay !== todayDay
+    const solution = isPractice
+        ? practice.solution
+        : isArchive
+          ? getWordForDay(archiveDay!)
+          : getWordByIndex(dayIndex)
+    const guesses = isPractice ? practice.guesses : isArchive ? (archive[archiveDay!] ?? []) : dailyGuesses
     const stats = isPractice ? practiceStats : dailyStats
     const isGameWon = guesses.includes(solution)
     const isGameLost = !isGameWon && guesses.length >= MAX_GUESSES
@@ -137,6 +163,9 @@ function App() {
     const setGuesses = (next: string[]) => {
         if (isPractice) {
             setPractice((p) => ({ ...p, guesses: next }))
+        } else if (isArchive) {
+            const day = archiveDay!
+            setArchive((a) => ({ ...a, [day]: next }))
         } else {
             setDailyGuesses(next)
         }
@@ -165,6 +194,18 @@ function App() {
         savePracticeState(practice)
     }, [practice])
 
+    // Today's game goes into the calendar history too
+    useEffect(() => {
+        if (dailyGuesses.length === 0) return
+        setArchive((a) =>
+            JSON.stringify(a[todayDay]) === JSON.stringify(dailyGuesses) ? a : { ...a, [todayDay]: dailyGuesses },
+        )
+    }, [dailyGuesses, todayDay])
+
+    useEffect(() => {
+        saveArchive(archive)
+    }, [archive])
+
     useEffect(() => {
         saveGameMode(mode)
         syncDuelUrl(mode === 'duel' ? duelCode : null)
@@ -191,22 +232,30 @@ function App() {
         return () => window.clearInterval(timer)
     }, [dayIndex, mode])
 
-    // Win animation, then the end-of-game dialog
+    // Win animation, then the end-of-game dialog - only right after the last guess, not when
+    // coming back to a finished game (other tab, reload); "Прикажи резултат" opens it then
+    const gameKey = isPractice ? `practice:${solution}` : isArchive ? `archive:${archiveDay}` : `daily:${dayIndex}`
     useEffect(() => {
-        if (!isGameOver) {
-            setIsGameOverModalOpen(false)
-            setIsWinAnimationStarted(false)
+        setIsGameOverModalOpen(false)
+        setIsWinAnimationStarted(false)
+        if (!isGameOver || justFinishedGame !== gameKey || shownResults.current.has(gameKey)) {
             return
         }
         const winTimer = isGameWon
             ? window.setTimeout(() => setIsWinAnimationStarted(true), 150 * WORD_LENGTH + 250)
             : undefined
-        const modalTimer = window.setTimeout(() => setIsGameOverModalOpen(true), isGameWon ? 2500 : 1600)
+        const modalTimer = window.setTimeout(
+            () => {
+                shownResults.current.add(gameKey)
+                setIsGameOverModalOpen(true)
+            },
+            isGameWon ? 2500 : 1600,
+        )
         return () => {
             window.clearTimeout(winTimer)
             window.clearTimeout(modalTimer)
         }
-    }, [isGameOver, isGameWon, mode, solution])
+    }, [isGameOver, isGameWon, gameKey, justFinishedGame])
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -221,6 +270,10 @@ function App() {
     }, [])
 
     const recordResult = (count: number) => {
+        if (isArchive) {
+            // past days don't change the statistics or the streak
+            return
+        }
         if (isPractice) {
             setPracticeStats((s) => addStatsForCompletedGame(s, count, undefined, PRACTICE_STATS))
         } else {
@@ -269,6 +322,7 @@ function App() {
         playSound('enter')
 
         if (currentGuess === solution) {
+            setJustFinishedGame(gameKey)
             recordResult(guesses.length)
             window.setTimeout(() => {
                 playSound('win')
@@ -276,6 +330,7 @@ function App() {
                 setCelebration((c) => c + 1)
             }, 150 * WORD_LENGTH + 250)
         } else if (nextGuesses.length === MAX_GUESSES) {
+            setJustFinishedGame(gameKey)
             recordResult(MAX_GUESSES)
             window.setTimeout(() => playSound('lose'), 500)
         }
@@ -284,9 +339,20 @@ function App() {
     const switchMode = (next: GameMode) => {
         if (next === mode) return
         setMode(next)
+        setArchiveDay(null)
         setCurrentGuess('')
         setIsGameOverModalOpen(false)
     }
+
+    const openDay = (dayNumber: number) => {
+        setMode('daily')
+        setArchiveDay(dayNumber === todayDay ? null : dayNumber)
+        setCurrentGuess('')
+        setIsCalendarOpen(false)
+        setIsGameOverModalOpen(false)
+    }
+
+    const playedDay = isArchive ? archiveDay! : todayDay
 
     const startNewPracticeGame = () => {
         if (isPractice && isGameInProgress) {
@@ -306,7 +372,7 @@ function App() {
             isPractice,
             isHardMode,
             isHighContrast,
-            dayIndex,
+            dayLabel: formatDayShort(playedDay),
         })
         if (result === 'copied') {
             showAlert('Резултатот е копиран, залепете го каде сакате', 'success')
@@ -399,7 +465,28 @@ function App() {
                 ) : (
                     <>
                         <p className="-mt-2 mb-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            {isPractice ? 'Вежба' : `Збор #${dayIndex}`}
+                            {isPractice ? (
+                                'Вежба'
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => setIsCalendarOpen(true)}
+                                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 uppercase hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+                                        title="Отвори календар"
+                                    >
+                                        <CalendarDaysIcon className="h-4 w-4" aria-hidden="true" />
+                                        {formatDay(playedDay)}
+                                    </button>
+                                    {isArchive && (
+                                        <button
+                                            onClick={() => openDay(todayDay)}
+                                            className="ml-1 rounded-md px-1.5 py-0.5 uppercase text-slate-700 dark:text-slate-200 underline underline-offset-2 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                        >
+                                            Денес
+                                        </button>
+                                    )}
+                                </>
+                            )}
                             {isHardMode && ' · тежок режим'}
                         </p>
                         <Grid
@@ -437,10 +524,23 @@ function App() {
                     solution={solution}
                     isWon={isGameWon}
                     mode={mode}
+                    isArchive={isArchive}
                     timeLeft={timeUntilNextWord}
                     onShare={handleShare}
                     onNewPracticeGame={startNewPracticeGame}
                     onSwitchToPractice={() => switchMode('practice')}
+                    onOpenCalendar={() => {
+                        setIsGameOverModalOpen(false)
+                        setIsCalendarOpen(true)
+                    }}
+                />
+                <CalendarModal
+                    isOpen={isCalendarOpen}
+                    handleClose={() => setIsCalendarOpen(false)}
+                    archive={archive}
+                    todayDay={todayDay}
+                    selectedDay={playedDay}
+                    onSelect={openDay}
                 />
                 <InfoModal isOpen={isInfoModalOpen} handleClose={() => setIsInfoModalOpen(false)} />
                 <StatsModal
@@ -448,7 +548,7 @@ function App() {
                     handleClose={() => setIsStatsModalOpen(false)}
                     gameStats={stats}
                     mode={mode}
-                    highlightIndex={isGameWon ? guesses.length - 1 : undefined}
+                    highlightIndex={isGameWon && !isArchive ? guesses.length - 1 : undefined}
                 />
                 <SettingsModal
                     isOpen={isSettingsModalOpen}

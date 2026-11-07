@@ -14,6 +14,7 @@ import {
     getMatchWinner,
     getRole,
     getTurnDeadline,
+    getTurnMs,
     isBoardDone,
     isDuelExpired,
     joinDuel,
@@ -31,7 +32,16 @@ import {
     loadPlayerName,
     savePlayerName,
 } from '../../lib/duel/store'
-import { Duel, OPPONENT_GRACE_MS, otherRole, Role, TURN_MS, WORD_LENGTH } from '../../lib/duel/types'
+import {
+    Duel,
+    formatTurnTime,
+    OPPONENT_GRACE_MS,
+    otherRole,
+    Role,
+    TURN_MS,
+    TURN_OPTIONS,
+    WORD_LENGTH,
+} from '../../lib/duel/types'
 
 type AlertVariant = 'success' | 'warning' | 'error'
 
@@ -79,6 +89,7 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
     const [isLoaded, setIsLoaded] = useState(false)
     const [name, setName] = useState(loadPlayerName)
     const [target, setTarget] = useState(3)
+    const [turnMs, setTurnMs] = useState(TURN_MS)
     const [isBusy, setIsBusy] = useState(false)
     const [currentGuess, setCurrentGuess] = useState('')
     const [isRowInvalid, setIsRowInvalid] = useState(false)
@@ -257,7 +268,7 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
             for (let attempt = 0; attempt < 3; attempt++) {
                 const newCode = generateDuelCode()
                 const created = await store.transact(newCode, (d) =>
-                    d ? undefined : createDuel(newCode, target, host, store.now()),
+                    d ? undefined : createDuel(newCode, target, host, store.now(), turnMs),
                 )
                 if (created) {
                     onCodeChange(newCode)
@@ -340,8 +351,29 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
                             </button>
                         ))}
                     </div>
+                    <p className="mt-4 text-sm font-semibold">Време за обид</p>
+                    <div className="mt-1 grid grid-cols-3 gap-2">
+                        {TURN_OPTIONS.map((ms) => (
+                            <button
+                                key={ms}
+                                onClick={() => setTurnMs(ms)}
+                                aria-pressed={turnMs === ms}
+                                className={classnames(
+                                    'rounded-lg py-2 font-semibold border-2 transition',
+                                    turnMs === ms
+                                        ? 'border-transparent bg-tile-correct text-white'
+                                        : 'border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700',
+                                )}
+                            >
+                                {ms < 60_000 ? `${ms / 1000} сек` : `${ms / 60_000} мин`}
+                            </button>
+                        ))}
+                    </div>
                     <ul className="mt-4 space-y-1 text-xs text-slate-600 dark:text-slate-400 list-disc pl-4">
-                        <li>Имате 1 минута за секој обид. Ако истече, се праќа тоа што сте го напишале.</li>
+                        <li>
+                            Имате {formatTurnTime(turnMs)} за секој обид. Ако истече, се праќа тоа што сте го
+                            напишале.
+                        </li>
                         <li>Ако и двајцата промашите, рундата е нерешена и нема поен.</li>
                     </ul>
                     <button className={`${primaryButton} mt-4`} onClick={createNewDuel} disabled={!store || isBusy}>
@@ -389,7 +421,8 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
                                 {duel.players.host.name} ве предизвикува!
                             </h2>
                             <p className="mt-1 mb-4 text-sm text-center text-slate-600 dark:text-slate-400">
-                                Се игра до {duel.target === 1 ? '1 победа' : `${duel.target} победи`}.
+                                Се игра до {duel.target === 1 ? '1 победа' : `${duel.target} победи`},{' '}
+                                {formatTurnTime(getTurnMs(duel))} за обид.
                             </p>
                             <NameField value={name} onChange={setName} />
                             <button className={`${primaryButton} mt-4`} onClick={join} disabled={isBusy}>
@@ -511,7 +544,7 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
                                 'bg-tile-correct': seconds > 10,
                                 'bg-red-500': seconds <= 10,
                             })}
-                            style={{ width: `${(msLeft / TURN_MS) * 100}%` }}
+                            style={{ width: `${(msLeft / getTurnMs(duel)) * 100}%` }}
                         />
                     </div>
                     <p

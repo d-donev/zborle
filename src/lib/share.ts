@@ -6,7 +6,8 @@ type ShareOptions = {
     isPractice: boolean
     isHardMode: boolean
     isHighContrast: boolean
-    dayIndex: number
+    /** date of the daily word, e.g. 7.11.2026 */
+    dayLabel: string
 }
 
 export type ShareResult = 'shared' | 'copied' | 'failed'
@@ -19,11 +20,11 @@ export const buildShareText = ({
     isPractice,
     isHardMode,
     isHighContrast,
-    dayIndex,
+    dayLabel,
 }: ShareOptions) => {
     const won = guesses.includes(solution)
     const score = won ? `${guesses.length}/6` : 'X/6'
-    const title = isPractice ? 'Зборле (вежба)' : `Зборле #${dayIndex}`
+    const title = isPractice ? 'Зборле (вежба)' : `Зборле ${dayLabel}`
     return `${title} ${score}${isHardMode ? '*' : ''}\n\n${generateEmojiGrid(guesses, solution, isHighContrast)}\n\n${getGameUrl()}`
 }
 

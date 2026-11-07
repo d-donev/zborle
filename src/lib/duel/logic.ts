@@ -18,10 +18,17 @@ import {
  * They run inside store transactions, so both players can call them safely at the same time.
  */
 
-export const createDuel = (code: string, target: number, host: DuelPlayer, now: number): Duel => ({
+export const createDuel = (
+    code: string,
+    target: number,
+    host: DuelPlayer,
+    now: number,
+    turnMs: number = TURN_MS,
+): Duel => ({
     code,
     createdAt: now,
     target,
+    turnMs,
     players: { host },
     score: { host: 0, guest: 0 },
 })
@@ -70,10 +77,12 @@ export const setReady = (duel: Duel | null, role: Role, now: number, pickWord: (
 export const isBoardDone = (board: DuelBoard | undefined) =>
     !!board && (board.solvedAt !== undefined || board.guesses.length >= MAX_GUESSES)
 
-/** When the current guess must be in: one minute after the previous guess (or the round start) */
+export const getTurnMs = (duel: Duel) => duel.turnMs ?? TURN_MS
+
+/** When the current guess must be in: the chosen time after the previous guess (or the round start) */
 export const getTurnDeadline = (duel: Duel, role: Role) => {
     const board = duel.boards?.[role]
-    return (board?.lastAt ?? duel.round?.startsAt ?? 0) + TURN_MS
+    return (board?.lastAt ?? duel.round?.startsAt ?? 0) + getTurnMs(duel)
 }
 
 export const submitGuess = (duel: Duel | null, role: Role, guess: string, now: number): Duel | undefined => {

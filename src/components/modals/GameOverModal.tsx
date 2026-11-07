@@ -1,4 +1,11 @@
-import { ArrowPathIcon, BookOpenIcon, CheckIcon, ShareIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import {
+    ArrowPathIcon,
+    BookOpenIcon,
+    CalendarDaysIcon,
+    CheckIcon,
+    ShareIcon,
+    XMarkIcon,
+} from '@heroicons/react/24/outline'
 import { DialogTitle } from '@headlessui/react'
 import { BaseModal } from './BaseModal'
 import { MiniGrid } from '../mini-grid/MiniGrid'
@@ -13,10 +20,13 @@ type Props = {
     solution: string
     isWon: boolean
     mode: GameMode
+    /** a past day picked from the calendar */
+    isArchive: boolean
     timeLeft: Time
     onShare: () => void
     onNewPracticeGame: () => void
     onSwitchToPractice: () => void
+    onOpenCalendar: () => void
 }
 
 const WIN_MESSAGES = ['Генијално!', 'Величествено!', 'Импресивно!', 'Одлично!', 'Браво!', 'Фуу, за малку!']
@@ -33,10 +43,12 @@ export const GameOverModal = ({
     solution,
     isWon,
     mode,
+    isArchive,
     timeLeft,
     onShare,
     onNewPracticeGame,
     onSwitchToPractice,
+    onOpenCalendar,
 }: Props) => {
     const title = isWon ? WIN_MESSAGES[Math.min(guesses.length, 6) - 1] : 'Следниот пат!'
     const meaningUrl = `https://www.google.com/search?q=${encodeURIComponent(`${solution.toLowerCase()} значење`)}`
@@ -88,7 +100,7 @@ export const GameOverModal = ({
                     <MiniGrid guesses={guesses} solution={solution} />
                 </div>
 
-                {mode === 'daily' && <TimeLeft timeLeft={timeLeft} />}
+                {mode === 'daily' && !isArchive && <TimeLeft timeLeft={timeLeft} />}
             </div>
 
             <div className="mt-4 space-y-2">
@@ -100,6 +112,11 @@ export const GameOverModal = ({
                     <button type="button" className={secondaryButton} onClick={onNewPracticeGame}>
                         <ArrowPathIcon className="h-5 w-5" aria-hidden="true" />
                         Нов збор
+                    </button>
+                ) : isArchive ? (
+                    <button type="button" className={secondaryButton} onClick={onOpenCalendar}>
+                        <CalendarDaysIcon className="h-5 w-5" aria-hidden="true" />
+                        Друг ден од календарот
                     </button>
                 ) : (
                     <button type="button" className={secondaryButton} onClick={onSwitchToPractice}>

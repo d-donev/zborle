@@ -117,6 +117,25 @@ describe('match', () => {
     })
 })
 
+describe('time per guess', () => {
+    it('uses the time chosen for the duel', () => {
+        let d: Duel | undefined = createDuel('X', 1, { id: 'h', name: 'A' }, 0, 30_000)
+        d = joinDuel(d, { id: 'g', name: 'B' })!
+        d = setReady(d, 'host', 0, pick)!
+        d = setReady(d, 'guest', 0, pick)!
+        const start = d.round!.startsAt
+        expect(getTurnDeadline(d, 'host')).toBe(start + 30_000)
+        expect(expireTurn(d, 'host', start + 29_999)).toBeUndefined()
+        expect(expireTurn(d, 'host', start + 30_000)?.boards?.host?.guesses).toEqual([TIMEOUT_GUESS])
+    })
+
+    it('falls back to one minute for duels created before the option existed', () => {
+        const d = startedDuel()
+        delete d.turnMs
+        expect(getTurnDeadline(d, 'host')).toBe(d.round!.startsAt + TURN_MS)
+    })
+})
+
 describe('missed turns', () => {
     it('uses up one try per missed minute, counted from each deadline', () => {
         let d = startedDuel()

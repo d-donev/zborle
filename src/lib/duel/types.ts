@@ -33,6 +33,8 @@ export type Duel = {
     createdAt: number
     /** wins needed to take the match: 1 or 3 */
     target: number
+    /** time allowed per guess; older duels without it use TURN_MS */
+    turnMs?: number
     players: { host: DuelPlayer; guest?: DuelPlayer }
     ready?: { host?: boolean; guest?: boolean }
     score: { host: number; guest: number }
@@ -45,6 +47,9 @@ export type Duel = {
 export const WORD_LENGTH = 5
 export const MAX_GUESSES = 6
 export const TURN_MS = 60_000
+export const TURN_OPTIONS = [30_000, 60_000, 120_000]
+
+export const formatTurnTime = (ms: number) => (ms < 60_000 ? `${ms / 1000} секунди` : ms === 60_000 ? '1 минута' : `${ms / 60_000} минути`)
 export const COUNTDOWN_MS = 3_000
 /** a duel with every player away this long is deleted the next time its link is opened */
 export const DUEL_EXPIRY_MS = 10 * 60_000
