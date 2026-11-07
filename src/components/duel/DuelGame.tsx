@@ -652,10 +652,24 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
                     </p>
                 </div>
             )}
+            {/* Out of tries while the opponent is still playing: no need to keep the word a secret */}
             {isPlaying && myDone && !round?.result && (
-                <p className="mb-3 text-center text-sm text-slate-500 dark:text-slate-400 animate-pulse">
-                    Ги потрошивте обидите, чекаме {opponent.name}…
-                </p>
+                <div className={`${card} mb-3 text-center`}>
+                    <p className="text-sm font-semibold">Ги потрошивте обидите. Зборот е:</p>
+                    <div className="flex justify-center gap-1 my-2" aria-label={`Зборот е ${solution}`}>
+                        {solution.split('').map((letter, i) => (
+                            <div
+                                key={i}
+                                className="tile-correct w-9 h-9 flex items-center justify-center rounded text-lg font-bold border-2"
+                            >
+                                {letter}
+                            </div>
+                        ))}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 animate-pulse">
+                        Чекаме {opponent.name} да заврши…
+                    </p>
+                </div>
             )}
 
             {/* Between rounds: result and the ready button */}
