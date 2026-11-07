@@ -42,7 +42,13 @@ export type Duel = {
     matches?: { host: number; guest: number }
     round?: DuelRound
     boards?: { host?: DuelBoard; guest?: DuelBoard }
+    /** the last emoji each player sent, with when, so the other screen can pop it up */
+    reactions?: { host?: DuelReaction; guest?: DuelReaction }
 }
+
+export type DuelReaction = { emoji: string; at: number }
+
+export const REACTIONS = ['😂', '🔥', '😱', '👀', '🐢']
 
 export const WORD_LENGTH = 5
 export const MAX_GUESSES = 6

@@ -185,3 +185,8 @@ export const rematch = (duel: Duel | null): Duel | undefined => {
 }
 
 export const getOpponent = (duel: Duel, role: Role) => duel.players[otherRole(role)]
+
+export const sendReaction = (duel: Duel | null, role: Role, emoji: string, now: number): Duel | undefined => {
+    if (!duel?.players[role]) return undefined
+    return { ...duel, reactions: { ...duel.reactions, [role]: { emoji, at: now } } }
+}

@@ -8,6 +8,7 @@ import {
     joinDuel,
     leaveDuel,
     rematch,
+    sendReaction,
     setReady,
     submitGuess,
 } from './logic'
@@ -154,6 +155,16 @@ describe('missed turns', () => {
         for (let i = 0; i < 6; i++) d = submitGuess(d, 'host', 'КВАРЦ', 4000 + i)!
         for (let i = 0; i < 6; i++) d = expireTurn(d, 'guest', 10 * TURN_MS)!
         expect(d.round?.result).toBe('draw')
+    })
+})
+
+describe('reactions', () => {
+    it("keeps each player's latest reaction", () => {
+        let d = startedDuel()
+        d = sendReaction(d, 'guest', '😂', 100)!
+        d = sendReaction(d, 'host', '🔥', 200)!
+        d = sendReaction(d, 'guest', '🐢', 300)!
+        expect(d.reactions).toEqual({ host: { emoji: '🔥', at: 200 }, guest: { emoji: '🐢', at: 300 } })
     })
 })
 

@@ -35,6 +35,7 @@ import { isValidDuelCode } from './lib/duel/store'
 import { ThemeToggle } from './components/ui/ThemeToggle'
 import { SoundToggle } from './components/ui/SoundToggle'
 import {
+    formatTime,
     getRandomWord,
     getTimeUntilNextWord,
     getWordByIndex,
@@ -498,6 +499,13 @@ function App() {
                                         <CalendarDaysIcon className="h-4 w-4" aria-hidden="true" />
                                         {formatDay(playedDay)}
                                     </button>
+                                    {!isArchive && isGameOver && (
+                                        <span className="ml-1 normal-case tabular-nums" title="До следниот збор">
+                                            · нов збор за {timeUntilNextWord.hours}:
+                                            {formatTime(timeUntilNextWord.minutes)}:
+                                            {formatTime(timeUntilNextWord.seconds)}
+                                        </span>
+                                    )}
                                     {isArchive && (
                                         <button
                                             onClick={() => openDay(todayDay)}

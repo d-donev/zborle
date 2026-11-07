@@ -20,6 +20,7 @@ import {
     joinDuel,
     leaveDuel,
     rematch,
+    sendReaction,
     setReady,
     submitGuess,
 } from '../../lib/duel/logic'
@@ -37,6 +38,7 @@ import {
     formatTurnTime,
     OPPONENT_GRACE_MS,
     otherRole,
+    REACTIONS,
     Role,
     TURN_MS,
     TURN_OPTIONS,
@@ -168,14 +170,38 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
         }
         if (!round.result || announcedRound.current === round.number) return
         announcedRound.current = round.number
+        setCurrentGuess('')
+        setResultPopupRound(round.number)
         if (round.result === role) {
             playSound('win')
             vibrate([60, 40, 60])
             setCelebration((c) => c + 1)
         } else if (round.result !== 'draw') {
             playSound('lose')
+            vibrate(200)
         }
     }, [round?.result, round?.number, role])
+
+    /** round whose result pops up in the middle of the screen (once, right when it ends) */
+    const [resultPopupRound, setResultPopupRound] = useState<number | null>(null)
+
+    // Emoji reactions: show the opponent's newest one for a moment (ignore old ones on load)
+    const opponentReaction = opponentRole ? duel?.reactions?.[opponentRole] : undefined
+    const [incomingReaction, setIncomingReaction] = useState<{ emoji: string; at: number } | null>(null)
+    useEffect(() => {
+        if (!opponentReaction || !store || store.now() - opponentReaction.at > 5000) return
+        setIncomingReaction(opponentReaction)
+        vibrate(30)
+        const timer = window.setTimeout(() => setIncomingReaction(null), 2400)
+        return () => window.clearTimeout(timer)
+    }, [opponentReaction?.at])
+
+    const lastReactionAt = useRef(0)
+    const react = (emoji: string) => {
+        if (!store || !code || !role || Date.now() - lastReactionAt.current < 1200) return
+        lastReactionAt.current = Date.now()
+        store.transact(code, (d) => sendReaction(d, role, emoji, store.now())).catch(() => {})
+    }
 
     const transact = async (fn: (d: Duel | null) => Duel | null | undefined) => {
         if (!store || !code) return null
@@ -502,12 +528,67 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
     const solution = round?.solution ?? ''
     const seconds = Math.ceil(msLeft / 1000)
 
+    const showResultPopup = !!round?.result && resultPopupRound === round.number
+    const resultHeadline =
+        round?.result === 'draw'
+            ? 'Никој не го погоди зборот'
+            : round?.result === role
+              ? 'Го погодивте зборот!'
+              : `${opponent.name} го погоди зборот!`
+
     return (
         <div>
             <Confetti trigger={celebration} />
 
+            {/* The moment a round ends, both players see who won and the word, front and centre */}
+            {showResultPopup && (
+                <div
+                    className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 px-4"
+                    role="alertdialog"
+                    aria-label={resultHeadline}
+                    onClick={() => setResultPopupRound(null)}
+                >
+                    <div
+                        className="pop-in w-full max-w-xs rounded-2xl bg-white dark:bg-slate-800 p-5 text-center shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="text-4xl" aria-hidden="true">
+                            {round!.result === 'draw' ? '🤝' : round!.result === role ? '🏆' : '😬'}
+                        </div>
+                        <p className="mt-2 text-xl font-bold text-slate-900 dark:text-white">{resultHeadline}</p>
+                        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Зборот беше:</p>
+                        <div className="mt-2 flex justify-center gap-1">
+                            {solution.split('').map((letter, i) => (
+                                <div
+                                    key={i}
+                                    className="tile-correct w-11 h-11 flex items-center justify-center rounded text-2xl font-bold border-2"
+                                >
+                                    {letter}
+                                </div>
+                            ))}
+                        </div>
+                        <p className="mt-3 text-sm font-semibold tabular-nums text-slate-700 dark:text-slate-300">
+                            {me.name} {duel.score[role]} : {duel.score[opponentRole!]} {opponent.name}
+                        </p>
+                        <button className={`${primaryButton} mt-4`} onClick={() => setResultPopupRound(null)}>
+                            Продолжи
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Scoreboard: me on the left, opponent (with their colours) on the right */}
-            <div className="mx-auto mb-3 w-[300px] flex items-center gap-3 rounded-2xl bg-slate-100 dark:bg-slate-800 px-3 py-2">
+            <div className="relative mx-auto mb-2 w-[300px] flex items-center gap-3 rounded-2xl bg-slate-100 dark:bg-slate-800 px-3 py-2">
+                {incomingReaction && (
+                    <span
+                        key={incomingReaction.at}
+                        className="reaction-float pointer-events-none absolute -bottom-4 right-6 z-20 text-5xl drop-shadow-lg"
+                        role="status"
+                        aria-label={`${opponent.name}: ${incomingReaction.emoji}`}
+                    >
+                        {incomingReaction.emoji}
+                    </span>
+                )}
                 <div className="flex-1 min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-700 dark:text-slate-200">{me.name}</p>
                     <p className="text-2xl font-bold tabular-nums text-slate-900 dark:text-white">{duel.score[role]}</p>
@@ -533,6 +614,20 @@ export const DuelGame = ({ code, onCodeChange, onExit, showAlert }: Props) => {
                     </p>
                 </div>
                 {round && <OpponentBoard guesses={opponentBoard?.guesses ?? []} solution={solution} />}
+            </div>
+
+            {/* Quick reactions for teasing the opponent */}
+            <div className="mx-auto mb-3 flex w-[300px] justify-center gap-2" aria-label="Реакции">
+                {REACTIONS.map((emoji) => (
+                    <button
+                        key={emoji}
+                        onClick={() => react(emoji)}
+                        className="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-800 text-lg leading-none transition hover:scale-110 active:scale-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                        aria-label={`Испрати ${emoji}`}
+                    >
+                        {emoji}
+                    </button>
+                ))}
             </div>
 
             {/* Turn timer */}

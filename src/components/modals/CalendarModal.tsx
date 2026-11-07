@@ -43,6 +43,15 @@ export const CalendarModal = ({ isOpen, handleClose, archive, todayDay, selected
         if (getDayResult(archive[n], getWordForDay(n)) === 'won') solvedThisYear++
     }
 
+    // Past days of this year that aren't solved yet, for the "random day" button
+    const unsolvedDays: number[] = []
+    for (let n = firstOfYear; n < todayDay; n++) {
+        if (getDayResult(archive[n], getWordForDay(n)) !== 'won') unsolvedDays.push(n)
+    }
+    const openRandomUnsolved = () => {
+        if (unsolvedDays.length) onSelect(unsolvedDays[Math.floor(Math.random() * unsolvedDays.length)])
+    }
+
     const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
     // Monday-first offset of the 1st of the month
     const leadingBlanks = (new Date(Date.UTC(year, month, 1)).getUTCDay() + 6) % 7
@@ -57,7 +66,15 @@ export const CalendarModal = ({ isOpen, handleClose, archive, todayDay, selected
                 дена
             </p>
 
-            <div className="mt-4 flex items-center justify-between">
+            <button
+                onClick={openRandomUnsolved}
+                disabled={unsolvedDays.length === 0}
+                className="mt-3 w-full rounded-xl bg-slate-100 dark:bg-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-100 transition hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-[0.99] disabled:opacity-50"
+            >
+                🎲 {unsolvedDays.length ? 'Случаен непогоден ден' : 'Сите минати денови се погодени!'}
+            </button>
+
+            <div className="mt-3 flex items-center justify-between">
                 <button
                     onClick={() => setMonth((m) => m - 1)}
                     disabled={month === 0}
